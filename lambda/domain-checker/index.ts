@@ -19,15 +19,6 @@ interface DomainItem {
   createdAt?: string;
 }
 
-interface RDAPResponse {
-  events?: Array<{
-    eventAction: string;
-    eventDate: string;
-  }>;
-  handle?: string;
-  ldhName?: string;
-}
-
 function calculateNextCheckDate(expirationDate: string): string {
   const expDate = new Date(expirationDate);
   const today = new Date();
