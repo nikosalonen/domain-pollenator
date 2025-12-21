@@ -17,6 +17,7 @@ export const handler = async (event: any) => {
   const daysUntilExpiration = event.daysUntilExpiration !== undefined
     ? event.daysUntilExpiration
     : (event.body ? JSON.parse(event.body).daysUntilExpiration : null);
+  const notificationType = event.notificationType || (event.body ? JSON.parse(event.body).notificationType : 'expired');
 
   if (!domainName || !expirationDate) {
     throw new Error('domainName and expirationDate are required');

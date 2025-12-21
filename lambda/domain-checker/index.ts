@@ -363,7 +363,7 @@ export const handler = async (event: any) => {
     const status = determineStatus(expirationDate);
     const nextCheckDate = calculateNextCheckDate(expirationDate);
 
-    // Reset notified flag if expiration date has changed (domain was renewed)
+    // Reset notification flags if expiration date has changed (domain was renewed)
     const expirationDateChanged = currentItem.expirationDate && currentItem.expirationDate !== expirationDate;
     const shouldResetNotified = expirationDateChanged;
 
@@ -383,11 +383,13 @@ export const handler = async (event: any) => {
       },
     });
 
-    // Reset notified flag if expiration date changed
+    // Reset notification flags if expiration date changed
     if (shouldResetNotified) {
-      updateCommand.input.UpdateExpression += ', notified = :notified';
+      updateCommand.input.UpdateExpression += ', notified = :notified, reminded3Days = :rem3, reminded1Day = :rem1';
       updateCommand.input.ExpressionAttributeValues![':notified'] = false;
-      console.log(`Expiration date changed for ${domainName}, resetting notified flag`);
+      updateCommand.input.ExpressionAttributeValues![':rem3'] = false;
+      updateCommand.input.ExpressionAttributeValues![':rem1'] = false;
+      console.log(`Expiration date changed for ${domainName}, resetting notification flags`);
     }
 
     // Set createdAt if this is a new record
