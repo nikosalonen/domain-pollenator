@@ -28,7 +28,7 @@ export class DomainPollenatorStack extends cdk.Stack {
 
     // Lambda: Notification Sender
     const notificationSenderLambda = new NodejsFunction(this, 'NotificationSenderLambda', {
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, '../lambda/notification-sender/index.ts'),
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
@@ -47,7 +47,7 @@ export class DomainPollenatorStack extends cdk.Stack {
 
     // Lambda: Domain Checker
     const domainCheckerLambda = new NodejsFunction(this, 'DomainCheckerLambda', {
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, '../lambda/domain-checker/index.ts'),
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
@@ -67,7 +67,7 @@ export class DomainPollenatorStack extends cdk.Stack {
 
     // Lambda: Scheduler
     const schedulerLambda = new NodejsFunction(this, 'SchedulerLambda', {
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, '../lambda/scheduler/index.ts'),
       timeout: cdk.Duration.minutes(5),
       memorySize: 256,
