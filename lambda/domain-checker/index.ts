@@ -139,31 +139,47 @@ async function queryWhoisWithReferrals(domain: string, startServer: string, maxD
 }
 
 function parseExpirationDate(dateStr: string): string | null {
-  // Clean up the date string
-  dateStr = dateStr.trim().replace(/[^\d\w\s\-\/\.:TZ]/g, '');
+  // Clean up the date string - remove extra whitespace and common prefixes
+  dateStr = dateStr.trim()
+    .replace(/^[^\d]*/, '') // Remove leading non-digits
+    .replace(/[^\d\w\s\-\/\.:TZ]+$/, '') // Remove trailing non-date chars
+    .trim();
 
-  // Try parsing as ISO date first
-  const isoMatch = dateStr.match(/^(\d{4}-\d{2}-\d{2})(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z?)?$/);
+  if (!dateStr) {
+    return null;
+  }
+
+  // Try parsing as ISO date first (2024-12-31 or 2024-12-31T00:00:00Z)
+  const isoMatch = dateStr.match(/^(\d{4}-\d{2}-\d{2})(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z?)?/);
   if (isoMatch) {
     const date = new Date(isoMatch[1]);
-    if (!isNaN(date.getTime())) {
+    if (!isNaN(date.getTime()) && date.getFullYear() > 1900 && date.getFullYear() < 2100) {
       return date.toISOString().split('T')[0];
     }
   }
 
-  // Try DD-MMM-YYYY format (e.g., "31-Dec-2024")
-  const mmmMatch = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  // Try DD-MMM-YYYY format (e.g., "31-Dec-2024" or "31 Dec 2024")
+  const mmmMatch = dateStr.match(/^(\d{1,2})[\s\-]([A-Za-z]{3})[\s\-](\d{4})$/);
   if (mmmMatch) {
     const [, day, month, year] = mmmMatch;
     const monthMap: { [key: string]: string } = {
-      'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
-      'may': '05', 'jun': '06', 'jul': '07', 'aug': '08',
-      'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12',
+      'jan': '01', 'january': '01',
+      'feb': '02', 'february': '02',
+      'mar': '03', 'march': '03',
+      'apr': '04', 'april': '04',
+      'may': '05',
+      'jun': '06', 'june': '06',
+      'jul': '07', 'july': '07',
+      'aug': '08', 'august': '08',
+      'sep': '09', 'september': '09',
+      'oct': '10', 'october': '10',
+      'nov': '11', 'november': '11',
+      'dec': '12', 'december': '12',
     };
     const monthNum = monthMap[month.toLowerCase()];
     if (monthNum) {
       const date = new Date(`${year}-${monthNum}-${day.padStart(2, '0')}`);
-      if (!isNaN(date.getTime())) {
+      if (!isNaN(date.getTime()) && date.getFullYear() > 1900 && date.getFullYear() < 2100) {
         return date.toISOString().split('T')[0];
       }
     }
@@ -174,7 +190,7 @@ function parseExpirationDate(dateStr: string): string | null {
   if (slashMatch) {
     const [, day, month, year] = slashMatch;
     const date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
-    if (!isNaN(date.getTime())) {
+    if (!isNaN(date.getTime()) && date.getFullYear() > 1900 && date.getFullYear() < 2100) {
       return date.toISOString().split('T')[0];
     }
   }
@@ -183,7 +199,20 @@ function parseExpirationDate(dateStr: string): string | null {
   const dashMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (dashMatch) {
     const date = new Date(dateStr);
-    if (!isNaN(date.getTime())) {
+    if (!isNaN(date.getTime()) && date.getFullYear() > 1900 && date.getFullYear() < 2100) {
+      return date.toISOString().split('T')[0];
+    }
+  }
+
+  // Try YYYYMMDD format (some registries use this)
+  const compactMatch = dateStr.match(/^(\d{8})$/);
+  if (compactMatch) {
+    const [, datePart] = compactMatch;
+    const year = datePart.substring(0, 4);
+    const month = datePart.substring(4, 6);
+    const day = datePart.substring(6, 8);
+    const date = new Date(`${year}-${month}-${day}`);
+    if (!isNaN(date.getTime()) && date.getFullYear() > 1900 && date.getFullYear() < 2100) {
       return date.toISOString().split('T')[0];
     }
   }
@@ -191,28 +220,110 @@ function parseExpirationDate(dateStr: string): string | null {
   return null;
 }
 
+interface WhatsMyDnsResponse {
+  data?: {
+    expires?: string;
+    created?: string;
+    updated?: string;
+    registered?: boolean;
+  };
+}
+
+async function queryWhatsMyDns(domain: string): Promise<string | null> {
+  try {
+    console.log(`Querying What's My DNS API for ${domain}`);
+    const response = await fetch(`https://www.whatsmydns.net/api/domain?q=${encodeURIComponent(domain)}`, {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'DomainPollenator/1.0',
+      },
+    });
+
+    if (!response.ok) {
+      console.log(`What's My DNS API returned status ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json() as WhatsMyDnsResponse;
+    
+    if (data.data?.expires) {
+      // Parse ISO date and return in YYYY-MM-DD format
+      const date = new Date(data.data.expires);
+      if (!isNaN(date.getTime())) {
+        const expirationDate = date.toISOString().split('T')[0];
+        console.log(`Found expiration date from What's My DNS API: ${expirationDate}`);
+        return expirationDate;
+      }
+    }
+
+    console.log(`No expiration date in What's My DNS API response for ${domain}`);
+    return null;
+  } catch (error) {
+    console.error(`What's My DNS API query failed for ${domain}:`, error);
+    return null;
+  }
+}
+
 async function queryWhois(domain: string): Promise<string | null> {
   try {
     console.log(`Querying WHOIS for ${domain} via IANA`);
     const whoisData = await queryWhoisWithReferrals(domain, 'whois.iana.org');
 
-    // Search for expiration-related fields
+    // Log a sample of the response for debugging (first 500 chars)
+    const sample = whoisData.substring(0, 500).replace(/\r/g, '').split('\n').slice(0, 10).join('\n');
+    console.log(`WHOIS response sample:\n${sample}...`);
+
+    // Search for expiration-related fields - expanded patterns
     const expirationFields = [
+      // Common formats with "date" keyword
       /expir\w+\s+date[^:]*:\s*([^\r\n]+)/i,
+      /expir\w+\s+on[^:]*:\s*([^\r\n]+)/i,
+      /renewal\s+date[^:]*:\s*([^\r\n]+)/i,
+      // Without "date" keyword
       /expir\w+[^:]*:\s*([^\r\n]+)/i,
       /renewal[^:]*:\s*([^\r\n]+)/i,
       /expires?[^:]*:\s*([^\r\n]+)/i,
+      // Finnish registry specific (might use different field names)
+      /expires?[^:]*:\s*([^\r\n]+)/i,
+      /valid\s+until[^:]*:\s*([^\r\n]+)/i,
+      /validity[^:]*:\s*([^\r\n]+)/i,
     ];
 
     for (const pattern of expirationFields) {
       const match = whoisData.match(pattern);
       if (match && match[1]) {
         const dateStr = match[1].trim();
+        console.log(`Found potential expiration field: "${dateStr}"`);
         const expirationDate = parseExpirationDate(dateStr);
 
         if (expirationDate) {
-          console.log(`Found expiration date: ${expirationDate} (parsed from: ${dateStr})`);
+          console.log(`Successfully parsed expiration date: ${expirationDate} (from: ${dateStr})`);
           return expirationDate;
+        } else {
+          console.log(`Could not parse date from: "${dateStr}"`);
+        }
+      }
+    }
+
+    // If no match, try to find any date-like patterns in the response
+    const datePatterns = [
+      /\b(\d{4}-\d{2}-\d{2})\b/,
+      /\b(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{4})\b/,
+      /\b(\d{1,2}-[A-Za-z]{3}-\d{4})\b/,
+    ];
+
+    console.log(`No expiration field found. Searching for any date patterns...`);
+    for (const pattern of datePatterns) {
+      const matches = whoisData.matchAll(new RegExp(pattern, 'gi'));
+      for (const match of matches) {
+        if (match[1]) {
+          const dateStr = match[1];
+          console.log(`Found date pattern: "${dateStr}"`);
+          const expirationDate = parseExpirationDate(dateStr);
+          if (expirationDate) {
+            console.log(`Parsed as expiration date: ${expirationDate}`);
+            return expirationDate;
+          }
         }
       }
     }
@@ -244,8 +355,14 @@ export const handler = async (event: any) => {
     const existingRecord = await dynamoClient.send(getCommand);
     const currentItem = (existingRecord.Item || { domainName }) as DomainItem;
 
-    // Query WHOIS via IANA (automatically follows referrals to correct registry)
-    const expirationDate = await queryWhois(domainName);
+    // Try What's My DNS API first (more reliable, structured data)
+    let expirationDate = await queryWhatsMyDns(domainName);
+
+    // Fallback to WHOIS if API doesn't work
+    if (!expirationDate) {
+      console.log(`What's My DNS API failed, falling back to WHOIS for ${domainName}`);
+      expirationDate = await queryWhois(domainName);
+    }
 
     // If no expiration date found, handle gracefully
     if (!expirationDate) {
