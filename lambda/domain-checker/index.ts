@@ -402,18 +402,61 @@ export const handler = async (event: any) => {
 
     console.log(`Updated domain ${domainName}: expiration=${expirationDate}, status=${status}, nextCheck=${nextCheckDate}`);
 
-    // Check if we need to send notification (only if domain is actually expired)
+    // Check if we need to send notification
     const expDate = new Date(expirationDate);
     const todayDate = new Date();
     todayDate.setHours(0, 0, 0, 0);
     const daysUntilExpiration = Math.floor((expDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    // Determine if we should notify - use updated notified status
+    // Determine notification status - use updated flags if expiration date changed
     const isNotified = shouldResetNotified ? false : (currentItem.notified || false);
+    const isReminded3Days = shouldResetNotified ? false : (currentItem.reminded3Days || false);
+    const isReminded1Day = shouldResetNotified ? false : (currentItem.reminded1Day || false);
 
-    // Only notify if domain is actually expired and hasn't been notified yet
+    // Check for 3-day reminder (send if 3 days or less, but more than 1 day, and not already reminded)
+    if (daysUntilExpiration <= 3 && daysUntilExpiration > 1 && !isReminded3Days && daysUntilExpiration >= 0) {
+      try {
+        const invokeCommand = new InvokeCommand({
+          FunctionName: NOTIFICATION_SENDER_FUNCTION_NAME,
+          InvocationType: 'Event',
+          Payload: JSON.stringify({
+            domainName,
+            expirationDate,
+            daysUntilExpiration: 3, // Use 3 for the email content
+            notificationType: 'reminder_3days',
+          }),
+        });
+
+        await lambdaClient.send(invokeCommand);
+        console.log(`Triggered 3-day reminder for domain ${domainName}`);
+      } catch (error) {
+        console.error(`Failed to trigger 3-day reminder for ${domainName}:`, error);
+      }
+    }
+
+    // Check for 1-day reminder (send if 1 day or less, but not expired, and not already reminded)
+    if (daysUntilExpiration <= 1 && daysUntilExpiration >= 0 && !isReminded1Day) {
+      try {
+        const invokeCommand = new InvokeCommand({
+          FunctionName: NOTIFICATION_SENDER_FUNCTION_NAME,
+          InvocationType: 'Event',
+          Payload: JSON.stringify({
+            domainName,
+            expirationDate,
+            daysUntilExpiration: 1, // Use 1 for the email content
+            notificationType: 'reminder_1day',
+          }),
+        });
+
+        await lambdaClient.send(invokeCommand);
+        console.log(`Triggered 1-day reminder for domain ${domainName}`);
+      } catch (error) {
+        console.error(`Failed to trigger 1-day reminder for ${domainName}:`, error);
+      }
+    }
+
+    // Check if domain is expired and notify
     if (daysUntilExpiration < 0 && !isNotified) {
-      // Trigger notification sender
       try {
         const invokeCommand = new InvokeCommand({
           FunctionName: NOTIFICATION_SENDER_FUNCTION_NAME,
@@ -422,6 +465,7 @@ export const handler = async (event: any) => {
             domainName,
             expirationDate,
             daysUntilExpiration,
+            notificationType: 'expired',
           }),
         });
 
