@@ -230,50 +230,6 @@ function parseExpirationDate(dateStr: string): string | null {
   return null;
 }
 
-interface WhatsMyDnsResponse {
-  data?: {
-    expires?: string;
-    created?: string;
-    updated?: string;
-    registered?: boolean;
-  };
-}
-
-async function queryWhatsMyDns(domain: string): Promise<string | null> {
-  try {
-    console.log(`Querying What's My DNS API for ${domain}`);
-    const response = await fetch(`https://www.whatsmydns.net/api/domain?q=${encodeURIComponent(domain)}`, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'DomainPollenator/1.0',
-      },
-    });
-
-    if (!response.ok) {
-      console.log(`What's My DNS API returned status ${response.status}`);
-      return null;
-    }
-
-    const data = await response.json() as WhatsMyDnsResponse;
-    
-    if (data.data?.expires) {
-      // Parse ISO date and return in YYYY-MM-DD format
-      const date = new Date(data.data.expires);
-      if (!isNaN(date.getTime())) {
-        const expirationDate = date.toISOString().split('T')[0];
-        console.log(`Found expiration date from What's My DNS API: ${expirationDate}`);
-        return expirationDate;
-      }
-    }
-
-    console.log(`No expiration date in What's My DNS API response for ${domain}`);
-    return null;
-  } catch (error) {
-    console.error(`What's My DNS API query failed for ${domain}:`, error);
-    return null;
-  }
-}
-
 async function queryWhois(domain: string): Promise<string | null> {
   try {
     console.log(`Querying WHOIS for ${domain} via IANA`);
@@ -315,29 +271,6 @@ async function queryWhois(domain: string): Promise<string | null> {
       }
     }
 
-    // If no match, try to find any date-like patterns in the response
-    const datePatterns = [
-      /\b(\d{4}-\d{2}-\d{2})\b/,
-      /\b(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{4})\b/,
-      /\b(\d{1,2}-[A-Za-z]{3}-\d{4})\b/,
-    ];
-
-    console.log(`No expiration field found. Searching for any date patterns...`);
-    for (const pattern of datePatterns) {
-      const matches = whoisData.matchAll(new RegExp(pattern, 'gi'));
-      for (const match of matches) {
-        if (match[1]) {
-          const dateStr = match[1];
-          console.log(`Found date pattern: "${dateStr}"`);
-          const expirationDate = parseExpirationDate(dateStr);
-          if (expirationDate) {
-            console.log(`Parsed as expiration date: ${expirationDate}`);
-            return expirationDate;
-          }
-        }
-      }
-    }
-
     console.log(`No parseable expiration date found in WHOIS response for ${domain}`);
     return null;
   } catch (error) {
@@ -365,14 +298,8 @@ export const handler = async (event: any) => {
     const existingRecord = await dynamoClient.send(getCommand);
     const currentItem = (existingRecord.Item || { domainName }) as DomainItem;
 
-    // Try What's My DNS API first (more reliable, structured data)
-    let expirationDate = await queryWhatsMyDns(domainName);
-
-    // Fallback to WHOIS if API doesn't work
-    if (!expirationDate) {
-      console.log(`What's My DNS API failed, falling back to WHOIS for ${domainName}`);
-      expirationDate = await queryWhois(domainName);
-    }
+    // Query WHOIS via IANA (automatically follows referrals to correct registry)
+    const expirationDate = await queryWhois(domainName);
 
     // If no expiration date found, handle gracefully
     if (!expirationDate) {
