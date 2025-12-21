@@ -7,6 +7,7 @@
     "build": "tsc",
     "watch": "tsc -w",
     "cdk": "cdk",
+    "bootstrap": "cdk bootstrap --cloudformation-execution-policies arn:aws:iam::aws:policy/AWSLambda_FullAccess,arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess,arn:aws:iam::aws:policy/CloudWatchLogsFullAccess,arn:aws:iam::aws:policy/AmazonEventBridgeFullAccess,arn:aws:iam::aws:policy/AmazonSESFullAccess,arn:aws:iam::aws:policy/IAMFullAccess,arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess,arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess",
     "deploy": "cdk deploy",
     "synth": "cdk synth",
     "diff": "cdk diff"
