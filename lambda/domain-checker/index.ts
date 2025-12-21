@@ -158,6 +158,16 @@ function parseExpirationDate(dateStr: string): string | null {
     }
   }
 
+  // Try DD.MM.YYYY with optional time (e.g., "13.6.2026 22:56:04" or "13.6.2026")
+  const dotTimeMatch = dateStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+\d{1,2}:\d{2}:\d{2})?$/);
+  if (dotTimeMatch) {
+    const [, day, month, year] = dotTimeMatch;
+    const date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+    if (!isNaN(date.getTime()) && date.getFullYear() > 1900 && date.getFullYear() < 2100) {
+      return date.toISOString().split('T')[0];
+    }
+  }
+
   // Try DD-MMM-YYYY format (e.g., "31-Dec-2024" or "31 Dec 2024")
   const mmmMatch = dateStr.match(/^(\d{1,2})[\s\-]([A-Za-z]{3})[\s\-](\d{4})$/);
   if (mmmMatch) {
@@ -185,8 +195,8 @@ function parseExpirationDate(dateStr: string): string | null {
     }
   }
 
-  // Try DD/MM/YYYY or DD.MM.YYYY format
-  const slashMatch = dateStr.match(/^(\d{1,2})[\/\.](\d{1,2})[\/\.](\d{4})$/);
+  // Try DD/MM/YYYY format (without time)
+  const slashMatch = dateStr.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
   if (slashMatch) {
     const [, day, month, year] = slashMatch;
     const date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
