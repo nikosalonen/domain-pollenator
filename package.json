@@ -1,0 +1,35 @@
+{
+  "name": "domain-pollenator",
+  "version": "1.0.0",
+  "description": "Domain expiration monitoring microservice",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "deploy": "cdk deploy",
+    "synth": "cdk synth",
+    "diff": "cdk diff"
+  },
+  "keywords": [
+    "aws",
+    "cdk",
+    "domain",
+    "monitoring"
+  ],
+  "author": "Niko Salonen",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^24",
+    "aws-cdk": "^2.1100.1",
+    "dotenv": "^17.2.3",
+    "esbuild": "^0.27.2",
+    "source-map-support": "^0.5.21",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.3"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.233.0",
+    "constructs": "^10.4.4"
+  }
+}
