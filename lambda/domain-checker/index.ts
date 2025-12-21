@@ -36,10 +36,23 @@ function calculateNextCheckDate(expirationDate: string): string {
     return nextCheck.toISOString().split('T')[0];
   }
 
-  // Schedule check for 1 day after expiration date
-  const nextCheck = new Date(expDate);
-  nextCheck.setDate(nextCheck.getDate() + 1);
-  return nextCheck.toISOString().split('T')[0];
+  // Schedule checks for reminder days and expiration
+  if (daysUntilExpiration > 3) {
+    // More than 3 days until expiration - schedule check for 3 days before expiration
+    const nextCheck = new Date(expDate);
+    nextCheck.setDate(nextCheck.getDate() - 3);
+    return nextCheck.toISOString().split('T')[0];
+  } else if (daysUntilExpiration > 1) {
+    // Between 3 and 1 days - schedule check for 1 day before expiration
+    const nextCheck = new Date(expDate);
+    nextCheck.setDate(nextCheck.getDate() - 1);
+    return nextCheck.toISOString().split('T')[0];
+  } else {
+    // 1 day or less - schedule check for 1 day after expiration
+    const nextCheck = new Date(expDate);
+    nextCheck.setDate(nextCheck.getDate() + 1);
+    return nextCheck.toISOString().split('T')[0];
+  }
 }
 
 function determineStatus(expirationDate: string): string {
