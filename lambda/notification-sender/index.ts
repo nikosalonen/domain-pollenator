@@ -7,6 +7,7 @@ const sesClient = new SESClient({});
 
 const DOMAINS_TABLE_NAME = process.env.DOMAINS_TABLE_NAME!;
 const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL!;
+const SENDER_EMAIL = process.env.SENDER_EMAIL || 'noreply@domain-pollenator.com';
 
 export const handler = async (event: any) => {
   console.log('NotificationSender Lambda triggered', JSON.stringify(event));
@@ -41,7 +42,7 @@ This is an automated message from Domain Pollenator.
 
     // Send email via SES
     const sendEmailCommand = new SendEmailCommand({
-      Source: NOTIFICATION_EMAIL,
+      Source: SENDER_EMAIL,
       Destination: {
         ToAddresses: [NOTIFICATION_EMAIL],
       },

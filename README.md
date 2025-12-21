@@ -31,6 +31,11 @@ npm install
 export NOTIFICATION_EMAIL=your-email@example.com
 ```
 
+   Optionally set the sender email address (defaults to `noreply@domain-pollenator.com`):
+```bash
+export SENDER_EMAIL=noreply@yourdomain.com
+```
+
 3. Bootstrap CDK (first time only):
 ```bash
 cdk bootstrap
@@ -57,9 +62,10 @@ The scheduler will automatically check domains right after their expiration date
 
 Before the service can send emails, you must:
 
-1. Verify your email address in SES Console
-2. If in SES Sandbox, verify both sender and recipient emails
-3. Request production access if needed (for sending to unverified emails)
+1. Verify your notification email address in SES Console (the recipient)
+2. Verify your sender email address in SES Console (defaults to `noreply@domain-pollenator.com`, or set via `SENDER_EMAIL`)
+3. If in SES Sandbox, verify both sender and recipient emails
+4. Request production access if needed (for sending to unverified emails)
 
 ## Free Tier Considerations
 

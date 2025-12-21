@@ -25,6 +25,7 @@ export class DomainPollenatorStack extends cdk.Stack {
 
     // SES Configuration - Get email from environment variable or use default
     const notificationEmail = process.env.NOTIFICATION_EMAIL || 'your-email@example.com';
+    const senderEmail = process.env.SENDER_EMAIL || 'noreply@domain-pollenator.com';
 
     // Lambda: Notification Sender
     const notificationSenderLambda = new NodejsFunction(this, 'NotificationSenderLambda', {
@@ -35,6 +36,7 @@ export class DomainPollenatorStack extends cdk.Stack {
       environment: {
         DOMAINS_TABLE_NAME: domainsTable.tableName,
         NOTIFICATION_EMAIL: notificationEmail,
+        SENDER_EMAIL: senderEmail,
       },
       logGroup: new logs.LogGroup(this, 'NotificationSenderLambdaLogGroup', {
         retention: logs.RetentionDays.ONE_WEEK,
