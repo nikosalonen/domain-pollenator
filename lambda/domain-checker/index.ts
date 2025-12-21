@@ -26,12 +26,12 @@ function calculateNextCheckDate(expirationDate: string): string {
 
   const daysUntilExpiration = Math.floor((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-  // If domain has already expired, no need to schedule another check
+  // If domain has already expired, check again in 30 days
+  // This allows monitoring if domain gets re-registered or is still available
   if (daysUntilExpiration < 0) {
-    // Return a far future date to prevent further checks
-    const farFuture = new Date(today);
-    farFuture.setFullYear(farFuture.getFullYear() + 10);
-    return farFuture.toISOString().split('T')[0];
+    const nextCheck = new Date(today);
+    nextCheck.setDate(nextCheck.getDate() + 30);
+    return nextCheck.toISOString().split('T')[0];
   }
 
   // Schedule check for 1 day after expiration date
@@ -348,6 +348,10 @@ export const handler = async (event: any) => {
     const status = determineStatus(expirationDate);
     const nextCheckDate = calculateNextCheckDate(expirationDate);
 
+    // Reset notified flag if expiration date has changed (domain was renewed)
+    const expirationDateChanged = currentItem.expirationDate && currentItem.expirationDate !== expirationDate;
+    const shouldResetNotified = expirationDateChanged;
+
     // Update DynamoDB
     const updateCommand = new UpdateCommand({
       TableName: DOMAINS_TABLE_NAME,
@@ -363,6 +367,13 @@ export const handler = async (event: any) => {
         ':status': status,
       },
     });
+
+    // Reset notified flag if expiration date changed
+    if (shouldResetNotified) {
+      updateCommand.input.UpdateExpression += ', notified = :notified';
+      updateCommand.input.ExpressionAttributeValues![':notified'] = false;
+      console.log(`Expiration date changed for ${domainName}, resetting notified flag`);
+    }
 
     // Set createdAt if this is a new record
     if (!currentItem.createdAt) {
@@ -380,8 +391,11 @@ export const handler = async (event: any) => {
     todayDate.setHours(0, 0, 0, 0);
     const daysUntilExpiration = Math.floor((expDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
 
+    // Determine if we should notify - use updated notified status
+    const isNotified = shouldResetNotified ? false : (currentItem.notified || false);
+
     // Only notify if domain is actually expired and hasn't been notified yet
-    if (daysUntilExpiration < 0 && !currentItem.notified) {
+    if (daysUntilExpiration < 0 && !isNotified) {
       // Trigger notification sender
       try {
         const invokeCommand = new InvokeCommand({
