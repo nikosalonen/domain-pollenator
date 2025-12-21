@@ -26,9 +26,42 @@ export const handler = async (event: any) => {
   try {
     const days = daysUntilExpiration !== null ? daysUntilExpiration : calculateDaysUntilExpiration(expirationDate);
 
-    // Create email content
-    const subject = `Domain Expired: ${domainName}`;
-    const body = `
+    // Create email content based on notification type
+    let subject: string;
+    let body: string;
+
+    if (notificationType === 'reminder_3days') {
+      subject = `Domain Expiring Soon: ${domainName} (3 days)`;
+      body = `
+Domain Expiration Reminder
+
+Domain: ${domainName}
+Expiration Date: ${expirationDate}
+Days Until Expiration: ${days}
+
+This domain will expire in 3 days. Please renew it if you want to keep it.
+
+---
+This is an automated message from Domain Pollenator.
+      `.trim();
+    } else if (notificationType === 'reminder_1day') {
+      subject = `Domain Expiring Tomorrow: ${domainName}`;
+      body = `
+Domain Expiration Reminder
+
+Domain: ${domainName}
+Expiration Date: ${expirationDate}
+Days Until Expiration: ${days}
+
+This domain will expire tomorrow. Please renew it immediately if you want to keep it.
+
+---
+This is an automated message from Domain Pollenator.
+      `.trim();
+    } else {
+      // expired
+      subject = `Domain Expired: ${domainName}`;
+      body = `
 Domain Expired Alert
 
 Domain: ${domainName}
@@ -39,7 +72,8 @@ This domain has expired. You may want to attempt to register it now that it's av
 
 ---
 This is an automated message from Domain Pollenator.
-    `.trim();
+      `.trim();
+    }
 
     // Send email via SES
     const sendEmailCommand = new SendEmailCommand({
@@ -62,20 +96,33 @@ This is an automated message from Domain Pollenator.
     });
 
     await sesClient.send(sendEmailCommand);
-    console.log(`Notification email sent for domain: ${domainName}`);
+    console.log(`Notification email sent for domain: ${domainName} (type: ${notificationType})`);
 
-    // Mark domain as notified in DynamoDB
+    // Mark domain notification flags in DynamoDB based on notification type
+    let updateExpression: string;
+    const expressionAttributeValues: any = {};
+
+    if (notificationType === 'reminder_3days') {
+      updateExpression = 'SET reminded3Days = :rem3';
+      expressionAttributeValues[':rem3'] = true;
+    } else if (notificationType === 'reminder_1day') {
+      updateExpression = 'SET reminded1Day = :rem1';
+      expressionAttributeValues[':rem1'] = true;
+    } else {
+      // expired
+      updateExpression = 'SET notified = :notified';
+      expressionAttributeValues[':notified'] = true;
+    }
+
     const updateCommand = new UpdateCommand({
       TableName: DOMAINS_TABLE_NAME,
       Key: { domainName },
-      UpdateExpression: 'SET notified = :notified',
-      ExpressionAttributeValues: {
-        ':notified': true,
-      },
+      UpdateExpression: updateExpression,
+      ExpressionAttributeValues: expressionAttributeValues,
     });
 
     await dynamoClient.send(updateCommand);
-    console.log(`Marked domain ${domainName} as notified`);
+    console.log(`Marked domain ${domainName} notification flag for ${notificationType}`);
 
     return {
       statusCode: 200,
