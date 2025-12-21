@@ -244,19 +244,50 @@ export const handler = async (event: any) => {
     const existingRecord = await dynamoClient.send(getCommand);
     const currentItem = (existingRecord.Item || { domainName }) as DomainItem;
 
-    // Query RDAP API
-    const rdapData = await queryRDAP(domainName);
+    // Query WHOIS via IANA (automatically follows referrals to correct registry)
+    const expirationDate = await queryWhois(domainName);
 
-    if (!rdapData) {
-      console.error(`Failed to get RDAP data for ${domainName}`);
-      throw new Error(`Failed to query RDAP for domain: ${domainName}`);
-    }
-
-    const expirationDate = extractExpirationDate(rdapData);
-
+    // If no expiration date found, handle gracefully
     if (!expirationDate) {
-      console.error(`No expiration date found in RDAP data for ${domainName}`);
-      throw new Error(`No expiration date found for domain: ${domainName}`);
+      console.warn(`No expiration date found for domain: ${domainName}. Setting status to 'unknown' and scheduling retry.`);
+      
+      const today = new Date().toISOString().split('T')[0];
+      // Schedule retry in 7 days
+      const retryDate = new Date();
+      retryDate.setDate(retryDate.getDate() + 7);
+      const nextCheckDate = retryDate.toISOString().split('T')[0];
+
+      // Update DynamoDB with unknown status
+      const updateCommand = new UpdateCommand({
+        TableName: DOMAINS_TABLE_NAME,
+        Key: { domainName },
+        UpdateExpression: 'SET lastChecked = :checked, nextCheckDate = :next, #status = :status',
+        ExpressionAttributeNames: {
+          '#status': 'status',
+        },
+        ExpressionAttributeValues: {
+          ':checked': today,
+          ':next': nextCheckDate,
+          ':status': 'unknown',
+        },
+      });
+
+      if (!currentItem.createdAt) {
+        updateCommand.input.UpdateExpression += ', createdAt = :created';
+        updateCommand.input.ExpressionAttributeValues![':created'] = today;
+      }
+
+      await dynamoClient.send(updateCommand);
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          domainName,
+          status: 'unknown',
+          message: 'Expiration date not available. Will retry in 7 days.',
+          nextCheckDate,
+        }),
+      };
     }
 
     const today = new Date().toISOString().split('T')[0];
