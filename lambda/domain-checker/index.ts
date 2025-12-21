@@ -16,6 +16,8 @@ interface DomainItem {
   nextCheckDate?: string;
   status?: string;
   notified?: boolean;
+  reminded3Days?: boolean;
+  reminded1Day?: boolean;
   createdAt?: string;
 }
 
