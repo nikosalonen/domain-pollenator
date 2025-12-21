@@ -55,48 +55,174 @@ function determineStatus(expirationDate: string): string {
   return 'active';
 }
 
-async function queryRDAP(domain: string): Promise<RDAPResponse | null> {
-  const rdapUrls = [
-    `https://rdap.org/domain/${domain}`,
-    `https://rdap.verisign.com/${domain}/domain`,
-  ];
+async function queryWhoisServer(domain: string, server: string, timeout: number = 10000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const client = new net.Socket();
+    let response = '';
+    let resolved = false;
 
-  for (const url of rdapUrls) {
-    try {
-      console.log(`Querying RDAP: ${url}`);
-      const response = await fetch(url, {
-        headers: {
-          'Accept': 'application/rdap+json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json() as RDAPResponse;
-        return data;
+    const cleanup = () => {
+      if (!resolved) {
+        resolved = true;
+        client.destroy();
       }
-    } catch (error) {
-      console.error(`RDAP query failed for ${url}:`, error);
-      continue;
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`WHOIS timeout for ${server}`));
+    }, timeout);
+
+    client.setEncoding('utf8');
+
+    client.on('connect', () => {
+      client.write(`${domain}\r\n`);
+    });
+
+    client.on('data', (chunk: Buffer) => {
+      response += chunk.toString();
+    });
+
+    client.on('end', () => {
+      clearTimeout(timer);
+      if (!resolved) {
+        resolved = true;
+        resolve(response);
+      }
+    });
+
+    client.on('error', (err: Error) => {
+      clearTimeout(timer);
+      cleanup();
+      reject(err);
+    });
+
+    try {
+      client.connect(43, server);
+    } catch (err) {
+      clearTimeout(timer);
+      cleanup();
+      reject(err);
+    }
+  });
+}
+
+async function queryWhoisWithReferrals(domain: string, startServer: string, maxDepth: number = 5): Promise<string> {
+  const visited = new Set<string>();
+  let currentServer = startServer;
+  let depth = 0;
+
+  while (depth < maxDepth) {
+    if (visited.has(currentServer)) {
+      throw new Error(`Circular WHOIS referral detected: ${currentServer}`);
+    }
+    visited.add(currentServer);
+
+    console.log(`Querying WHOIS server: ${currentServer} (depth: ${depth})`);
+    const response = await queryWhoisServer(domain, currentServer);
+
+    // Check for referral to another server
+    const referMatch = response.match(/refer:\s*([^\s\r\n]+)/i);
+    if (referMatch) {
+      const nextServer = referMatch[1].trim();
+      if (nextServer !== currentServer && !visited.has(nextServer)) {
+        currentServer = nextServer;
+        depth++;
+        continue;
+      }
+    }
+
+    return response;
+  }
+
+  throw new Error(`Max WHOIS referral depth reached (${maxDepth})`);
+}
+
+function parseExpirationDate(dateStr: string): string | null {
+  // Clean up the date string
+  dateStr = dateStr.trim().replace(/[^\d\w\s\-\/\.:TZ]/g, '');
+
+  // Try parsing as ISO date first
+  const isoMatch = dateStr.match(/^(\d{4}-\d{2}-\d{2})(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z?)?$/);
+  if (isoMatch) {
+    const date = new Date(isoMatch[1]);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+  }
+
+  // Try DD-MMM-YYYY format (e.g., "31-Dec-2024")
+  const mmmMatch = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (mmmMatch) {
+    const [, day, month, year] = mmmMatch;
+    const monthMap: { [key: string]: string } = {
+      'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
+      'may': '05', 'jun': '06', 'jul': '07', 'aug': '08',
+      'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12',
+    };
+    const monthNum = monthMap[month.toLowerCase()];
+    if (monthNum) {
+      const date = new Date(`${year}-${monthNum}-${day.padStart(2, '0')}`);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0];
+      }
+    }
+  }
+
+  // Try DD/MM/YYYY or DD.MM.YYYY format
+  const slashMatch = dateStr.match(/^(\d{1,2})[\/\.](\d{1,2})[\/\.](\d{4})$/);
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch;
+    const date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+  }
+
+  // Try YYYY-MM-DD format
+  const dashMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dashMatch) {
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
     }
   }
 
   return null;
 }
 
-function extractExpirationDate(rdapData: RDAPResponse): string | null {
-  if (!rdapData.events) {
+async function queryWhois(domain: string): Promise<string | null> {
+  try {
+    console.log(`Querying WHOIS for ${domain} via IANA`);
+    const whoisData = await queryWhoisWithReferrals(domain, 'whois.iana.org');
+
+    // Search for expiration-related fields
+    const expirationFields = [
+      /expir\w+\s+date[^:]*:\s*([^\r\n]+)/i,
+      /expir\w+[^:]*:\s*([^\r\n]+)/i,
+      /renewal[^:]*:\s*([^\r\n]+)/i,
+      /expires?[^:]*:\s*([^\r\n]+)/i,
+    ];
+
+    for (const pattern of expirationFields) {
+      const match = whoisData.match(pattern);
+      if (match && match[1]) {
+        const dateStr = match[1].trim();
+        const expirationDate = parseExpirationDate(dateStr);
+
+        if (expirationDate) {
+          console.log(`Found expiration date: ${expirationDate} (parsed from: ${dateStr})`);
+          return expirationDate;
+        }
+      }
+    }
+
+    console.log(`No parseable expiration date found in WHOIS response for ${domain}`);
+    return null;
+  } catch (error) {
+    console.error(`WHOIS query failed for ${domain}:`, error);
     return null;
   }
-
-  const expirationEvent = rdapData.events.find(
-    (event) => event.eventAction === 'expiration'
-  );
-
-  if (expirationEvent && expirationEvent.eventDate) {
-    return expirationEvent.eventDate.split('T')[0]; // Extract date part only
-  }
-
-  return null;
 }
 
 export const handler = async (event: any) => {
