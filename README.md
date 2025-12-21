@@ -1,6 +1,6 @@
 # Domain Pollenator
 
-A serverless microservice that monitors domain expiration dates and sends email notifications 7 days before expiration. Built with AWS CDK and designed to stay within AWS free tier limits.
+A serverless microservice that monitors domain expiration dates and sends email notifications when domains actually expire. Built with AWS CDK and designed to stay within AWS free tier limits.
 
 ## Architecture
 
@@ -51,10 +51,7 @@ aws dynamodb put-item \
   --item '{"domainName": {"S": "example.com"}}'
 ```
 
-The scheduler will automatically check domains based on their expiration proximity:
-- Daily: Domains expiring within 30 days
-- Weekly: Domains expiring within 90 days
-- Monthly: Domains expiring beyond 90 days
+The scheduler will automatically check domains right after their expiration date. Domains are scheduled to be checked 1 day after their expiration date to verify if they have actually expired.
 
 ## SES Configuration
 

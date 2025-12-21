@@ -25,15 +25,15 @@ export const handler = async (event: any) => {
     const days = daysUntilExpiration !== null ? daysUntilExpiration : calculateDaysUntilExpiration(expirationDate);
 
     // Create email content
-    const subject = `Domain Expiration Alert: ${domainName}`;
+    const subject = `Domain Expired: ${domainName}`;
     const body = `
-Domain Expiration Alert
+Domain Expired Alert
 
 Domain: ${domainName}
 Expiration Date: ${expirationDate}
-Days Until Expiration: ${days}
+Days Since Expiration: ${Math.abs(days)}
 
-This domain will expire in ${days} day(s). You may want to attempt to register it when it becomes available.
+This domain has expired. You may want to attempt to register it now that it's available.
 
 ---
 This is an automated message from Domain Pollenator.

@@ -34,17 +34,17 @@ function calculateNextCheckDate(expirationDate: string): string {
 
   const daysUntilExpiration = Math.floor((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-  let nextCheckDays: number;
-  if (daysUntilExpiration <= 30) {
-    nextCheckDays = 1; // Daily checks for domains expiring within 30 days
-  } else if (daysUntilExpiration <= 90) {
-    nextCheckDays = 7; // Weekly checks for domains expiring within 90 days
-  } else {
-    nextCheckDays = 30; // Monthly checks for domains expiring beyond 90 days
+  // If domain has already expired, no need to schedule another check
+  if (daysUntilExpiration < 0) {
+    // Return a far future date to prevent further checks
+    const farFuture = new Date(today);
+    farFuture.setFullYear(farFuture.getFullYear() + 10);
+    return farFuture.toISOString().split('T')[0];
   }
 
-  const nextCheck = new Date(today);
-  nextCheck.setDate(nextCheck.getDate() + nextCheckDays);
+  // Schedule check for 1 day after expiration date
+  const nextCheck = new Date(expDate);
+  nextCheck.setDate(nextCheck.getDate() + 1);
   return nextCheck.toISOString().split('T')[0];
 }
 
@@ -171,13 +171,14 @@ export const handler = async (event: any) => {
 
     console.log(`Updated domain ${domainName}: expiration=${expirationDate}, status=${status}, nextCheck=${nextCheckDate}`);
 
-    // Check if we need to send notification (7 days before expiration)
+    // Check if we need to send notification (only if domain is actually expired)
     const expDate = new Date(expirationDate);
     const todayDate = new Date();
     todayDate.setHours(0, 0, 0, 0);
     const daysUntilExpiration = Math.floor((expDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (daysUntilExpiration <= 7 && daysUntilExpiration >= 0 && !currentItem.notified) {
+    // Only notify if domain is actually expired and hasn't been notified yet
+    if (daysUntilExpiration < 0 && !currentItem.notified) {
       // Trigger notification sender
       try {
         const invokeCommand = new InvokeCommand({
@@ -191,7 +192,7 @@ export const handler = async (event: any) => {
         });
 
         await lambdaClient.send(invokeCommand);
-        console.log(`Triggered notification for ${domainName}`);
+        console.log(`Triggered notification for expired domain ${domainName}`);
       } catch (error) {
         console.error(`Failed to trigger notification for ${domainName}:`, error);
       }
