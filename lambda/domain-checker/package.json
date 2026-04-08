@@ -4,9 +4,9 @@
   "description": "Domain checker Lambda for RDAP queries",
   "main": "index.js",
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.490.0",
-    "@aws-sdk/client-lambda": "^3.490.0",
-    "@aws-sdk/lib-dynamodb": "^3.490.0"
+    "@aws-sdk/client-dynamodb": "^3.1027.0",
+    "@aws-sdk/client-lambda": "^3.1027.0",
+    "@aws-sdk/lib-dynamodb": "^3.1027.0"
   }
 }
 
