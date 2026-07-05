@@ -91,11 +91,13 @@ describe('IAM permissions', () => {
   const statementsWithAction = (action: string) =>
     allStatements().filter((s) => [s.Action].flat().includes(action));
 
-  it('scopes SES sending to the sender identities instead of *', () => {
+  it('scopes SES sending to the sender and recipient identities instead of *', () => {
     const sesStatements = statementsWithAction('ses:SendEmail');
     expect(sesStatements).toHaveLength(1);
     const resources = [sesStatements[0].Resource].flat();
-    expect(resources).toHaveLength(2);
+    // Sender address, sender domain, and the recipient (SES authorizes against
+    // verified recipient identities too - always the case in sandbox mode)
+    expect(resources).toHaveLength(3);
     expect(resources).not.toContain('*');
   });
 

@@ -115,7 +115,9 @@ export class DomainPollenatorStack extends cdk.Stack {
 
     // IAM Permissions: Notification Sender (only updates notification flags, never reads)
     domainsTable.grantWriteData(notificationSenderLambda);
-    // Scope sending to the sender identity - covers both address- and domain-verified identities
+    // Scope sending to the sender identity - covers both address- and domain-verified identities.
+    // SES also authorizes against recipient identities that are verified in the account (always the
+    // case in sandbox mode), so the notification address must be included too.
     const senderDomain = senderEmail.split('@')[1];
     notificationSenderLambda.addToRolePolicy(
       new iam.PolicyStatement({
@@ -124,6 +126,7 @@ export class DomainPollenatorStack extends cdk.Stack {
         resources: [
           this.formatArn({ service: 'ses', resource: 'identity', resourceName: senderEmail, arnFormat: cdk.ArnFormat.SLASH_RESOURCE_NAME }),
           this.formatArn({ service: 'ses', resource: 'identity', resourceName: senderDomain, arnFormat: cdk.ArnFormat.SLASH_RESOURCE_NAME }),
+          this.formatArn({ service: 'ses', resource: 'identity', resourceName: notificationEmail, arnFormat: cdk.ArnFormat.SLASH_RESOURCE_NAME }),
         ],
       })
     );
