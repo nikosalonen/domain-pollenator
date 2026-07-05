@@ -35,6 +35,8 @@ Event flow (all Lambda-to-Lambda invocations are async, `InvocationType: 'Event'
 
 Failed async invocations of any of the three Lambdas land in a shared SQS DLQ (after Lambda's built-in retries); a CloudWatch alarm on queue depth notifies `NOTIFICATION_EMAIL` via SNS.
 
+**SNS subscription gotcha:** the owner's mail pipeline auto-follows unsubscribe links, which kills email subscriptions confirmed via the email link. The live subscription was therefore created manually (`aws sns subscribe` + `aws sns confirm-subscription --authenticate-on-unsubscribe true`, pasting the token from the confirmation email instead of clicking it) and is NOT the CloudFormation-managed one, which is dead. If the topic is ever replaced, the manual subscription must be recreated the same way.
+
 Note: despite "RDAP" appearing in the README and some descriptions, the checker actually uses classic WHOIS (port 43), not RDAP.
 
 ### Scheduling and notification logic (spread across the Lambdas)
