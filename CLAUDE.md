@@ -31,6 +31,8 @@ Event flow (all Lambda-to-Lambda invocations are async, `InvocationType: 'Event'
 3. **Domain Checker** (`lambda/domain-checker/`) queries WHOIS starting at `whois.iana.org` over raw TCP port 43, following `refer:` referrals to the authoritative registry. It parses the expiration date out of freeform WHOIS text (multiple field-name and date-format patterns), updates the domain record, and invokes **Notification Sender** when a notification is due
 4. **Notification Sender** (`lambda/notification-sender/`) sends the SES email, then sets the corresponding dedup flag on the domain record
 
+Failed async invocations of any of the three Lambdas land in a shared SQS DLQ (after Lambda's built-in retries); a CloudWatch alarm on queue depth notifies `NOTIFICATION_EMAIL` via SNS.
+
 Note: despite "RDAP" appearing in the README and some descriptions, the checker actually uses classic WHOIS (port 43), not RDAP.
 
 ### Scheduling and notification logic (spread across the Lambdas)

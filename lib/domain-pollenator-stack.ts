@@ -1,11 +1,17 @@
 import * as cdk from 'aws-cdk-lib';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as destinations from 'aws-cdk-lib/aws-lambda-destinations';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -28,12 +34,20 @@ export class DomainPollenatorStack extends cdk.Stack {
     const notificationEmail = process.env.NOTIFICATION_EMAIL || 'your-email@example.com';
     const senderEmail = process.env.SENDER_EMAIL || 'noreply@domain-pollenator.com';
 
+    // Shared DLQ for failed async invocations of all three Lambdas
+    const deadLetterQueue = new sqs.Queue(this, 'FailedInvocationsQueue', {
+      retentionPeriod: cdk.Duration.days(14),
+      enforceSSL: true,
+    });
+    const onFailure = new destinations.SqsDestination(deadLetterQueue);
+
     // Lambda: Notification Sender
     const notificationSenderLambda = new NodejsFunction(this, 'NotificationSenderLambda', {
       runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, '../lambda/notification-sender/index.ts'),
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
+      onFailure,
       environment: {
         DOMAINS_TABLE_NAME: domainsTable.tableName,
         NOTIFICATION_EMAIL: notificationEmail,
@@ -55,6 +69,7 @@ export class DomainPollenatorStack extends cdk.Stack {
       // WHOIS referral chains can take up to 5 queries x 10s socket timeout
       timeout: cdk.Duration.seconds(60),
       memorySize: 256,
+      onFailure,
       environment: {
         DOMAINS_TABLE_NAME: domainsTable.tableName,
         NOTIFICATION_SENDER_FUNCTION_NAME: notificationSenderLambda.functionName,
@@ -74,6 +89,7 @@ export class DomainPollenatorStack extends cdk.Stack {
       entry: path.join(__dirname, '../lambda/scheduler/index.ts'),
       timeout: cdk.Duration.minutes(5),
       memorySize: 256,
+      onFailure,
       environment: {
         DOMAINS_TABLE_NAME: domainsTable.tableName,
         DOMAIN_CHECKER_FUNCTION_NAME: domainCheckerLambda.functionName,
@@ -129,6 +145,23 @@ export class DomainPollenatorStack extends cdk.Stack {
     });
 
     dailyRule.addTarget(new targets.LambdaFunction(schedulerLambda));
+
+    // Alert on anything landing in the DLQ, delivered by email
+    const alertTopic = new sns.Topic(this, 'AlertTopic');
+    alertTopic.addSubscription(new snsSubscriptions.EmailSubscription(notificationEmail));
+
+    const dlqAlarm = new cloudwatch.Alarm(this, 'FailedInvocationsAlarm', {
+      alarmDescription: 'A domain-pollenator Lambda invocation failed and landed in the DLQ',
+      metric: deadLetterQueue.metricApproximateNumberOfMessagesVisible({
+        period: cdk.Duration.minutes(5),
+        statistic: 'Maximum',
+      }),
+      threshold: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    dlqAlarm.addAlarmAction(new cloudwatchActions.SnsAction(alertTopic));
 
     // Outputs
     new cdk.CfnOutput(this, 'DomainsTableName', {

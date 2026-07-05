@@ -6,15 +6,6 @@ tier, so free-tier limits are not a real constraint. Keep solutions correspondin
 (The free-tier figures previously listed here were dated anyway — e.g. the old 62k/month
 SES allowance no longer exists for newer accounts.)
 
-## High Priority
-
-### Dead Letter Queues (SQS)
-**Status:** Pending
-**Benefit:** All three async hops (EventBridge → Scheduler → Checker → Sender) are
-fire-and-forget. A failed WHOIS lookup or SES send vanishes silently after Lambda's
-built-in retries. A single shared SQS DLQ (`onFailure` destination on the Lambdas)
-plus one alarm on its depth is enough at this scale.
-
 ## Nice to Have
 
 ### CloudWatch Alarms
@@ -34,4 +25,6 @@ move the recipient.
 
 ## Done
 
+- ~~Dead Letter Queues (SQS)~~ — shared DLQ as `onFailure` destination on all three
+  Lambdas, depth alarm notifies via SNS email (2026-07-06)
 - ~~CI workflow~~ — GitHub Actions runs typecheck, tests, and synth on push/PR (2026-07-06)

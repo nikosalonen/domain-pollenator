@@ -130,3 +130,36 @@ describe('Scheduling', () => {
     });
   });
 });
+
+describe('Failure handling', () => {
+  it('creates a single shared dead-letter queue with 14-day retention', () => {
+    const queues = template.findResources('AWS::SQS::Queue');
+    expect(Object.keys(queues)).toHaveLength(1);
+    template.hasResourceProperties('AWS::SQS::Queue', {
+      MessageRetentionPeriod: 14 * 24 * 60 * 60,
+    });
+  });
+
+  it('routes failed async invocations of every function to the DLQ', () => {
+    const configs = template.findResources('AWS::Lambda::EventInvokeConfig');
+    expect(Object.keys(configs)).toHaveLength(3);
+    for (const config of Object.values(configs)) {
+      expect(config.Properties.DestinationConfig.OnFailure.Destination).toBeDefined();
+    }
+  });
+
+  it('alarms on DLQ depth and notifies via SNS email', () => {
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      Namespace: 'AWS/SQS',
+      MetricName: 'ApproximateNumberOfMessagesVisible',
+      Threshold: 1,
+      ComparisonOperator: 'GreaterThanOrEqualToThreshold',
+      TreatMissingData: 'notBreaching',
+      AlarmActions: [Match.anyValue()],
+    });
+    template.hasResourceProperties('AWS::SNS::Subscription', {
+      Protocol: 'email',
+      Endpoint: 'alerts@example.com',
+    });
+  });
+});
