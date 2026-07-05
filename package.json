@@ -2,13 +2,18 @@
   "name": "domain-pollenator",
   "version": "1.0.0",
   "description": "Serverless AWS microservice that monitors domain expiration dates and sends email notifications when domains expire",
-  "main": "lib/index.js",
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
+    "test": "vitest run",
     "cdk": "cdk",
     "bootstrap": "cdk bootstrap --cloudformation-execution-policies arn:aws:iam::aws:policy/AWSLambda_FullAccess,arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess,arn:aws:iam::aws:policy/CloudWatchLogsFullAccess,arn:aws:iam::aws:policy/AmazonEventBridgeFullAccess,arn:aws:iam::aws:policy/AmazonSESFullAccess,arn:aws:iam::aws:policy/IAMFullAccess,arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess,arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess",
     "deploy": "cdk deploy",
+    "destroy": "cdk destroy",
     "synth": "cdk synth",
     "diff": "cdk diff"
   },
@@ -27,7 +32,8 @@
     "esbuild": "^0.28.1",
     "source-map-support": "^0.5.21",
     "tsx": "^4.23.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   },
   "dependencies": {
     "aws-cdk-lib": "^2.261.0",

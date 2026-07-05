@@ -4,12 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Serverless AWS microservice (CDK + TypeScript) that monitors domain expiration dates via WHOIS and sends email reminders/alerts through SES. Designed to stay within AWS free tier. There are no tests and no linter configured.
+Serverless AWS microservice (CDK + TypeScript) that monitors domain expiration dates via WHOIS and sends email reminders/alerts through SES. Designed to stay within AWS free tier. No linter is configured.
 
 ## Commands
 
 ```bash
-npm run build      # tsc typecheck/compile (Lambdas are bundled by esbuild at synth, so this is mainly for type-checking)
+npm test           # vitest — CDK assertion tests + unit tests for the domain-checker date logic (test/)
+npx vitest run test/domain-checker.test.ts   # run a single test file
+npm run build      # tsc typecheck only (noEmit — Lambdas are bundled by esbuild at synth)
 npm run synth      # cdk synth — synthesize CloudFormation template (good smoke test)
 npm run diff       # cdk diff against deployed stack
 npm run deploy     # cdk deploy
@@ -38,6 +40,7 @@ Note: despite "RDAP" appearing in the README and some descriptions, the checker 
 - Three notification types with matching dedup flags on the DynamoDB item: `reminder_3days`/`reminded3Days`, `reminder_1day`/`reminded1Day`, `expired`/`notified`. Domain Checker reads the flags to decide whether to notify; Notification Sender sets them after a successful send.
 - When the WHOIS expiration date changes (domain renewed), Domain Checker resets all three flags so the next cycle re-notifies.
 - The `DomainItem` interface is duplicated in each Lambda (they can drift — scheduler's copy lacks the notification flags). Keep them in sync when changing the record shape.
+- The domain-checker's pure functions (`parseExpirationDate`, `calculateNextCheckDate`, `determineStatus`) are exported for unit testing; tests freeze time with fake timers and run under `TZ=UTC` (set in `vitest.config.ts`) because the date logic mixes UTC and local time.
 
 Domain records are created externally (AWS CLI/Console `put-item` with just `domainName`); the checker fills in the rest on first run.
 

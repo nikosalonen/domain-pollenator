@@ -21,7 +21,7 @@ interface DomainItem {
   createdAt?: string;
 }
 
-function calculateNextCheckDate(expirationDate: string): string {
+export function calculateNextCheckDate(expirationDate: string): string {
   const expDate = new Date(expirationDate);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -55,7 +55,7 @@ function calculateNextCheckDate(expirationDate: string): string {
   }
 }
 
-function determineStatus(expirationDate: string): string {
+export function determineStatus(expirationDate: string): string {
   const expDate = new Date(expirationDate);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -153,7 +153,7 @@ async function queryWhoisWithReferrals(domain: string, startServer: string, maxD
   throw new Error(`Max WHOIS referral depth reached (${maxDepth})`);
 }
 
-function parseExpirationDate(dateStr: string): string | null {
+export function parseExpirationDate(dateStr: string): string | null {
   // Clean up the date string - remove extra whitespace and common prefixes
   dateStr = dateStr.trim()
     .replace(/^[^\d]*/, '') // Remove leading non-digits

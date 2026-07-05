@@ -17,7 +17,8 @@ export class DomainPollenatorStack extends cdk.Stack {
     const domainsTable = new dynamodb.Table(this, 'DomainsTable', {
       partitionKey: { name: 'domainName', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      // The domain list is the only stateful resource in the stack - keep it on stack deletion
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
       pointInTimeRecoverySpecification: {
         pointInTimeRecoveryEnabled: false,
       },
@@ -51,11 +52,11 @@ export class DomainPollenatorStack extends cdk.Stack {
     const domainCheckerLambda = new NodejsFunction(this, 'DomainCheckerLambda', {
       runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(__dirname, '../lambda/domain-checker/index.ts'),
-      timeout: cdk.Duration.seconds(30),
+      // WHOIS referral chains can take up to 5 queries x 10s socket timeout
+      timeout: cdk.Duration.seconds(60),
       memorySize: 256,
       environment: {
         DOMAINS_TABLE_NAME: domainsTable.tableName,
-        NOTIFICATION_EMAIL: notificationEmail,
         NOTIFICATION_SENDER_FUNCTION_NAME: notificationSenderLambda.functionName,
       },
       logGroup: new logs.LogGroup(this, 'DomainCheckerLambdaLogGroup', {
@@ -76,7 +77,6 @@ export class DomainPollenatorStack extends cdk.Stack {
       environment: {
         DOMAINS_TABLE_NAME: domainsTable.tableName,
         DOMAIN_CHECKER_FUNCTION_NAME: domainCheckerLambda.functionName,
-        NOTIFICATION_SENDER_FUNCTION_NAME: notificationSenderLambda.functionName,
       },
       logGroup: new logs.LogGroup(this, 'SchedulerLambdaLogGroup', {
         retention: logs.RetentionDays.ONE_WEEK,
@@ -97,13 +97,18 @@ export class DomainPollenatorStack extends cdk.Stack {
       })
     );
 
-    // IAM Permissions: Notification Sender
-    domainsTable.grantReadWriteData(notificationSenderLambda);
+    // IAM Permissions: Notification Sender (only updates notification flags, never reads)
+    domainsTable.grantWriteData(notificationSenderLambda);
+    // Scope sending to the sender identity - covers both address- and domain-verified identities
+    const senderDomain = senderEmail.split('@')[1];
     notificationSenderLambda.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: ['ses:SendEmail', 'ses:SendRawEmail'],
-        resources: ['*'],
+        resources: [
+          this.formatArn({ service: 'ses', resource: 'identity', resourceName: senderEmail, arnFormat: cdk.ArnFormat.SLASH_RESOURCE_NAME }),
+          this.formatArn({ service: 'ses', resource: 'identity', resourceName: senderDomain, arnFormat: cdk.ArnFormat.SLASH_RESOURCE_NAME }),
+        ],
       })
     );
 
