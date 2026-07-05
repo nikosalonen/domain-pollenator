@@ -1,7 +1,7 @@
 {
   "name": "domain-checker",
   "version": "1.0.0",
-  "description": "Domain checker Lambda for RDAP queries",
+  "description": "Domain checker Lambda for WHOIS queries",
   "main": "index.js",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1079.0",
