@@ -20,6 +20,8 @@ npm run bootstrap  # cdk bootstrap with scoped execution policies (first time on
 
 Deployment config comes from a `.env` file (loaded via dotenv in `bin/domain-pollenator.ts`) or exported env vars: `NOTIFICATION_EMAIL`, `SENDER_EMAIL`. These are read at **synth time** and baked into Lambda environment variables — changing them requires a redeploy. Default region is `eu-west-1`.
 
+The CDK bootstrap pins the CloudFormation execution role to an explicit managed-policy list (the `bootstrap` script). **When the stack starts using a new AWS service, add the matching policy to that list and re-run `npm run bootstrap`** — otherwise the deploy fails with `not authorized to perform <service>:<action>` from the `cdk-*-cfn-exec-role`. IAM caps the role at 10 managed policies.
+
 ## Architecture
 
 CDK app: `bin/domain-pollenator.ts` → single stack `lib/domain-pollenator-stack.ts`. Each Lambda lives in `lambda/<name>/index.ts`, is bundled directly from TypeScript by `NodejsFunction`/esbuild, and has its own `package.json` for its AWS SDK dependencies (root `package.json` only holds CDK tooling).
