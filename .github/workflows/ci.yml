@@ -18,6 +18,12 @@ jobs:
 
       - run: npm ci
 
+      - name: Install Lambda dependencies
+        run: |
+          for dir in lambda/*/; do
+            (cd "$dir" && npm ci)
+          done
+
       - name: Typecheck
         run: npm run build
 
