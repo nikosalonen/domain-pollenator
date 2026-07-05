@@ -21,16 +21,16 @@
   "author": "Niko Salonen",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^24",
-    "aws-cdk": "^2.1100.1",
-    "dotenv": "^17.2.3",
-    "esbuild": "^0.27.2",
+    "@types/node": "^24.13.2",
+    "aws-cdk": "^2.1129.0",
+    "dotenv": "^17.4.2",
+    "esbuild": "^0.28.1",
     "source-map-support": "^0.5.21",
-    "tsx": "^4.21.0",
-    "typescript": "~5.9.3"
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3"
   },
   "dependencies": {
-    "aws-cdk-lib": "^2.233.0",
-    "constructs": "^10.4.4"
+    "aws-cdk-lib": "^2.261.0",
+    "constructs": "^10.6.0"
   }
 }
