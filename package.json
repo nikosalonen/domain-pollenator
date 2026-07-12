@@ -27,7 +27,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^24.13.2",
-    "aws-cdk": "^2.1129.0",
+    "aws-cdk": "^2.1130.0",
     "dotenv": "^17.4.2",
     "esbuild": "^0.28.1",
     "source-map-support": "^0.5.21",
