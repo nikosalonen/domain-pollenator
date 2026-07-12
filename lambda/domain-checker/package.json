@@ -4,8 +4,8 @@
   "description": "Domain checker Lambda for WHOIS queries",
   "main": "index.js",
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1079.0",
-    "@aws-sdk/client-lambda": "^3.1079.0",
-    "@aws-sdk/lib-dynamodb": "^3.1079.0"
+    "@aws-sdk/client-dynamodb": "^3.1085.0",
+    "@aws-sdk/client-lambda": "^3.1085.0",
+    "@aws-sdk/lib-dynamodb": "^3.1085.0"
   }
 }
