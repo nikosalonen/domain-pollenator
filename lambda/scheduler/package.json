@@ -4,8 +4,8 @@
   "description": "Scheduler Lambda for domain polling",
   "main": "index.js",
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1079.0",
-    "@aws-sdk/client-lambda": "^3.1079.0",
-    "@aws-sdk/lib-dynamodb": "^3.1079.0"
+    "@aws-sdk/client-dynamodb": "^3.1090.0",
+    "@aws-sdk/client-lambda": "^3.1090.0",
+    "@aws-sdk/lib-dynamodb": "^3.1090.0"
   }
 }
